@@ -58,17 +58,17 @@ def main():
                 SubmitC4DToDeadline17.main( path )
             except:
                 print traceback.format_exc()
-                print( "The SubmitC4DToDeadline17.py script could not be found in the Deadline Repository. Please make sure that the Deadline Client has been installed on this machine, that the Deadline Client bin folder is set in the DEADLINE_PATH environment variable, and that the Deadline Client has been configured to point to a valid Repository." )
+                print( "The SubmitC4DToDeadline17.py script could not be found in the Deadline Repository." )
         else:
             try:
                 import SubmitC4DToDeadline
                 SubmitC4DToDeadline.main( path )
             except:
                 print traceback.format_exc()
-                print( "The SubmitC4DToDeadline.py script could not be found in the Deadline Repository. Please make sure that the Deadline Client has been installed on this machine, that the Deadline Client bin folder is set in the DEADLINE_PATH environment variable, and that the Deadline Client has been configured to point to a valid Repository." )
+                print( "The SubmitC4DToDeadline.py script could not be found in the Deadline Repository." )
 
     else:
-        print( "Could not find Repository root. Make sure the Deadline client applications are installed on this machine, and that the Monitor can connect to the Repository." )
+        print( "Could not find Repository root." )
 
 if __name__=='__main__':
     main()
