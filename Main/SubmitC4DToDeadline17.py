@@ -192,6 +192,7 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
         doc = documents.GetActiveDocument()
         takeData = doc.GetTakeData()
         take = takeData.GetMainTake()
+        self.CurrentTake = takeData.GetCurrentTake().GetName()
         
         self.Takes = []
         while take:
@@ -549,6 +550,9 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
             self.AddChild( self.TakesBoxID, i, self.Takes[ i ] )
             if initTakes == self.Takes[ i ]:
                 selectedTakeID = i
+
+        # Find current take in list of all takes
+        selectedTakeID = self.Takes.index( str( self.CurrentTake ) )
         # Custom Racecar Takes End
 
         self.AddChild( self.IntegrationTypeBoxID, 0, "Shotgun" )
