@@ -1,0 +1,106 @@
+[SceneFile]
+Type=filename
+Label=Scene Filename
+Category=Scene File
+Index=0
+Description=The scene filename as it exists on the network
+Required=false
+DisableIfBlank=true
+
+[Version]
+Type=label
+Label=Version
+Index=0
+Category=Cinema 4D Info
+Description=The version of Cinema 4D to render with
+Required=false
+DisableIfBlank=true
+
+[Build]
+Type=enum
+Values=None;32bit;64bit
+Label=Cinema 4D Build To Force
+Category=Cinema 4D Info
+Index=1
+Description=The build of Cinema 4D to force
+Required=false
+DisableIfBlank=true
+
+[Threads]
+Type=integer
+Minimum=0
+Label=Threads
+Index=2
+Category=Cinema 4D Info
+Description=Number of threads to use (specify 0 to automatically use the optimal thread count)
+Required=false
+DisableIfBlank=true
+
+[Width]
+Type=integer
+Minimum=0
+Label=Image Width
+Category=Output Resolution
+Index=0
+Description=The width of the image in pixels
+Required=false
+DisableIfBlank=true
+
+[Height]
+Type=integer
+Minimum=0
+Label=Image Height
+Category=Output Resolution
+Index=1
+Description=The height of the image in pixels
+Required=false
+DisableIfBlank=true
+
+[FilePath]
+Type=folder
+Label=Output File Path
+Category=Output
+Index=0
+Description=An existing directory where the output will be sent
+Required=false
+DisableIfBlank=false
+DefaultValue=
+
+[FilePrefix]
+Type=string
+Label=Output File Prefix
+Category=Output
+Index=1
+Description=The output filename prefix
+Required=false
+DisableIfBlank=false
+DefaultValue=
+
+[MultiFilePath]
+Type=folder
+Label=MP Output File Path
+Category=Output
+Index=2
+Description=An existing directory where the multipass output will be sent
+Required=false
+DisableIfBlank=false
+DefaultValue=
+
+[MultiFilePrefix]
+Type=string
+Label=MP Output File Prefix
+Category=Output
+Index=3
+Description=The multipass output filename prefix
+Required=false
+DisableIfBlank=false
+DefaultValue=
+
+[LocalRendering]
+Type=boolean
+Label=Enable Local Rendering
+Category=Output
+Index=4
+Description=If this option is set to true, the slaves will render locally, and then copy the images to the network output directory on completion.
+Required=false
+DisableIfBlank=true
