@@ -9,6 +9,7 @@ import c4d
 from c4d import documents
 from c4d import gui
 from c4d import plugins
+from c4d.modules import takesystem
 
 ## The submission dialog class.
 class SubmitC4DToDeadlineDialog (gui.GeDialog):
@@ -63,6 +64,9 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
     FramesBoxID = 160
     ChunkSizeBoxID = 170
     ThreadsBoxID = 180
+
+    TakesBoxID = 191
+
     BuildBoxID = 190
     LocalRenderingBoxID = 195
     SubmitSceneBoxID = 200
@@ -169,7 +173,35 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
         self.Builds.append( "32bit" )
         self.Builds.append( "64bit" )
 
+
+        # Custom Racecar Takes Start
+        # Iterate through objects in take (op)
+        def GetNextObject( op ):
+            if op==None:
+              return None
+          
+            if op.GetDown():
+              return op.GetDown()
+          
+            while not op.GetNext() and op.GetUp():
+              op = op.GetUp()
+          
+            return op.GetNext()
+
+        # Set Takes setting
+        doc = documents.GetActiveDocument()
+        takeData = doc.GetTakeData()
+        take = takeData.GetMainTake()
+        
+        self.Takes = []
+        while take:
+            name = take.GetName() # this is the take name
+            self.Takes.append( name )
+            take = GetNextObject(take) 
         c4d.StatusClear()
+        # print self.Takes
+        # Custom Racecar Takes End
+
 
     def GetLabelID( self ):
         self.LabelID = self.LabelID + 1
@@ -226,7 +258,7 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
 
     ## This is called when the dialog is initialized.
     def CreateLayout( self ):
-        self.SetTitle( "Submit To Deadline 17" )
+        self.SetTitle( "Submit To Deadline 17 Beta" )
 
         self.TabGroupBegin( self.GetLabelID(), 0 )
         #General Options Tab
@@ -254,11 +286,12 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
         self.EndGroup()
 
         self.StartGroup( "Cinema 4D Options" )
-        self.AddTextBoxGroup( self.FramesBoxID, "Frame List" )
-        #self.AddRangeBoxGroup( self.ChunkSizeBoxID, "Frames Per Task", 1, 999999, 1 )
-        #self.AddRangeBoxGroup( self.ThreadsBoxID, "Threads To Use", 0, 16, 1 )
-        #self.AddComboBoxGroup( self.BuildBoxID, "Build To Force", self.SubmitSceneBoxID, "Submit Cinema 4D Scene File" )
 
+        # Custom Racecar Takes Start
+        self.AddComboBoxGroup( self.TakesBoxID, "Take List" )
+        # Custom Racecar Takes End
+
+        self.AddTextBoxGroup( self.FramesBoxID, "Frame List" )
         self.AddRangeBoxGroup( self.ChunkSizeBoxID, "Frames Per Task", 1, 999999, 1, self.SubmitSceneBoxID, "Submit Cinema 4D Scene File" )
         self.AddRangeBoxGroup( self.ThreadsBoxID, "Threads To Use", 0, 256, 1, self.ExportProjectBoxID, "Export Project Before Submission" )
         self.AddComboBoxGroup( self.BuildBoxID, "Build To Force", self.LocalRenderingBoxID, "Enable Local Rendering" )
@@ -393,6 +426,10 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
         initOnComplete = "Nothing"
         initSubmitSuspended = False
 
+        # Custom Racecar Takes Start
+        initTakes = "None"
+        # Custom Racecar Takes End
+
         initFrames = frameList
         initChunkSize = 1
         initThreads = 0
@@ -505,6 +542,15 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
             if initBuild == self.Builds[ i ]:
                 selectedBuildID = i
 
+        # Custom Racecar Takes Start
+        # Fill the take array
+        selectedTakeID = 0
+        for i in range( 0, len(self.Takes) ):
+            self.AddChild( self.TakesBoxID, i, self.Takes[ i ] )
+            if initTakes == self.Takes[ i ]:
+                selectedTakeID = i
+        # Custom Racecar Takes End
+
         self.AddChild( self.IntegrationTypeBoxID, 0, "Shotgun" )
         if initIntegration == "FTrack":
             self.integrationType = 1
@@ -530,6 +576,8 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
         self.SetString( self.DependenciesBoxID, initDependencies )
         self.SetLong( self.OnCompleteBoxID, selectedOnCompleteID )
         self.SetBool( self.SubmitSuspendedBoxID, initSubmitSuspended )
+
+        self.SetLong( self.TakesBoxID, selectedTakeID )
 
         self.SetString( self.FramesBoxID, initFrames )
         self.SetLong( self.ChunkSizeBoxID, initChunkSize )
@@ -743,6 +791,11 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
             dependencies = self.GetString( self.DependenciesBoxID )
             onComplete = self.OnComplete[ self.GetLong( self.OnCompleteBoxID ) ]
             submitSuspended = self.GetBool( self.SubmitSuspendedBoxID )
+
+            # Custom Racecar Takes Start
+            # activeTake = self.GetString( self.TakesBoxID )
+            activeTake = self.Takes[ self.GetLong( self.TakesBoxID ) ]
+            # Custom Racecar Takes End
 
             frames = self.GetString( self.FramesBoxID )
             chunkSize = self.GetLong( self.ChunkSizeBoxID )
@@ -1002,12 +1055,16 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
                 fileHandle = open( pluginInfoFile, "w" )
                 if not submitScene:
                     fileHandle.write( "SceneFile=%s\n" % sceneFilename )
-                fileHandle.write( "Version=%s\n" % (c4d.GetC4DVersion() / 1000) )
+                # fileHandle.write( "Version=%s\n" % (c4d.GetC4DVersion() / 1000) )
+                fileHandle.write( "Version=%s\n" %  17 )
                 fileHandle.write( "Build=%s\n" % build )
                 fileHandle.write( "Threads=%s\n" % threads )
                 fileHandle.write( "Width=%s\n" % width )
                 fileHandle.write( "Height=%s\n" % height )
                 fileHandle.write( "LocalRendering=%s\n" % localRendering )
+                # Custom Racecar Takes Start
+                fileHandle.write( "Take=%s\n" % activeTake )
+                # Custom Racecar Takes End
 
                 if saveOutput and outputPath != "":
                     head, tail = os.path.split( outputPath )
