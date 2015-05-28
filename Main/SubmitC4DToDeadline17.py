@@ -1,4 +1,4 @@
-import os, sys, subprocess, re, traceback
+import os, sys, subprocess, re, traceback, datetime
 
 try:
     import ConfigParser
@@ -194,15 +194,17 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
         take = takeData.GetMainTake()
         self.CurrentTake = takeData.GetCurrentTake().GetName()
         
-        self.Takes = []
+        # Add All to the top of the list
+        self.Takes = ['All']
         while take:
             name = take.GetName() # this is the take name
             self.Takes.append( name )
-            take = GetNextObject(take) 
+            take = GetNextObject(take)
+        # Add All to the top of the list
+
         c4d.StatusClear()
         # print self.Takes
         # Custom Racecar Takes End
-
 
     def GetLabelID( self ):
         self.LabelID = self.LabelID + 1
@@ -620,8 +622,26 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
 
         return True
 
+    ## Custom Racecar function to find spesial frame range token in take name i.e <%10-240%>
+    def getTakeFrames( self, s ):
+        try:
+            start = s.index( "<%" ) + len( "<%" )
+            end = s.index( "%>", start )
+            return s[start:end]
+        except ValueError:
+            return ""
+
+    def stripTakeName( self, s ):
+        try:
+            start = s.index( "<%"  )
+            end = s.index( "%>" )
+            return s.replace(s[start:end+2], "")
+        except ValueError:
+            return ""
+
     ## This is called when a user clicks on a button or changes the value of a field.
     def Command( self, id, msg ):
+
         # The Limit Group browse button was pressed.
         if id == self.LimitGroupsButtonID:
             c4d.StatusSetSpin()
@@ -634,7 +654,6 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
                 self.SetString( self.LimitGroupsBoxID, result )
 
             c4d.StatusClear()
-
         # The Dependencies browse button was pressed.
         elif id == self.DependenciesButtonID:
             c4d.StatusSetSpin()
@@ -647,7 +666,6 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
                 self.SetString( self.DependenciesBoxID, result )
 
             c4d.StatusClear()
-
         elif id == self.MachineListButtonID:
             c4d.StatusSetSpin()
 
@@ -659,10 +677,8 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
                 self.SetString( self.MachineListBoxID, result )
 
             c4d.StatusClear()
-
         elif id == self.ExportProjectBoxID:
             self.Enable( self.SubmitSceneBoxID, not self.GetBool( self.ExportProjectBoxID ) )
-
         elif id == self.ConnectToIntegrationButtonID:
             c4d.StatusSetSpin()
 
@@ -697,7 +713,6 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
                 self.Command( self.UseIntegrationBoxID, None )
             finally:
                 c4d.StatusClear()
-
         elif id == self.UseIntegrationBoxID:
             enable = self.GetBool( self.UseIntegrationBoxID )
             self.Enable( self.IntegrationVersionBoxID, enable )
@@ -714,7 +729,6 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
                 self.ShotgunJobSettings[ 'VersionName' ] = self.GetString( self.IntegrationVersionBoxID )
             else:
                 self.FTrackJobSettings[ 'FT_AssetName' ] = self.GetString( self.IntegrationVersionBoxID )
-
         elif id == self.IntegrationDescriptionBoxID:
             if integrationType == 0:
                 self.ShotgunJobSettings[ 'Description' ] = self.GetString( self.IntegrationDescriptionBoxID )
@@ -739,7 +753,6 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
             enable = (enable and self.GetBool( self.UseIntegrationBoxID ))
             self.Enable( self.UploadDraftToShotgunBoxID, enable )
             self.Enable( self.DraftUseShotgunDataButtonID, enable )
-
         elif id == self.DraftTemplateButtonID:
             c4d.StatusSetSpin()
 
@@ -751,7 +764,6 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
                     self.SetString( self.DraftTemplateBoxID, result )
             finally:
                 c4d.StatusClear()
-
         elif id == self.DraftUseShotgunDataButtonID:
             shotgunValues = self.GetString( self.IntegrationInfoBoxID ).split( '\n' )
 
@@ -773,7 +785,6 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
 
             if draftTemplate.strip() != "" and draftTemplate != "None":
                 self.SetString( self.DraftTemplateBoxID, draftTemplate )
-
         # The Submit or the Cancel button was pressed.
         elif id == self.SubmitButtonID or id == self.CancelButtonID:
             jobName = self.GetString( self.NameBoxID )
@@ -851,252 +862,285 @@ class SubmitC4DToDeadlineDialog (gui.GeDialog):
 
             # Close the dialog if the Cancel button was clicked
             if id == self.SubmitButtonID:
-                groupBatch = False
-                if exportProject:
-                    scene = documents.GetActiveDocument()
-                    sceneName = scene.GetDocumentName()
-                    originalSceneFilename = os.path.join( scene.GetDocumentPath(), sceneName )
-
-                    print( "Exporting scene" )
-                    c4d.StatusSetSpin()
-                    c4d.CallCommand( 12255 )
-                    c4d.StatusClear()
-
-                    scene = documents.GetActiveDocument()
-                    sceneName = scene.GetDocumentName()
-                    newSceneFilename = os.path.join( scene.GetDocumentPath(), sceneName )
-
-                    # If the scene file name hasn't changed, that means that they canceled the export dialog.
-                    if newSceneFilename == originalSceneFilename:
-                        return True
-
-                    #continueOn = gui.QuestionDialog( "After the export, the scene file path is now:\n\n" + sceneFilename + "\n\nDo you wish to continue with the submission?" )
-                    #if not continueOn:
-                    #	return True
-
-                    submitScene = False # can't submit scene if it's being exported
-
-                scene = documents.GetActiveDocument()
-                sceneName = scene.GetDocumentName()
-                #sceneFilename = scene.GetDocumentPath() + "/" + sceneName
-                sceneFilename = os.path.join( scene.GetDocumentPath(), sceneName )
-                renderData = scene.GetActiveRenderData().GetData()
-
-                saveOutput = renderData.GetBool( c4d.RDATA_SAVEIMAGE )
-                outputPath = renderData.GetFilename( c4d.RDATA_PATH )
-                outputFormat = renderData.GetLong( c4d.RDATA_FORMAT )
-                outputName = renderData.GetLong( c4d.RDATA_NAMEFORMAT )
-
-                saveMP = renderData.GetBool( c4d.RDATA_MULTIPASS_ENABLE ) and renderData.GetBool( c4d.RDATA_MULTIPASS_SAVEIMAGE )
-                mpPath = renderData.GetFilename( c4d.RDATA_MULTIPASS_FILENAME )
-                mpFormat = renderData.GetLong( c4d.RDATA_MULTIPASS_SAVEFORMAT )
-                mpOneFile = renderData.GetBool( c4d.RDATA_MULTIPASS_SAVEONEFILE )
-
-                width = renderData.GetLong( c4d.RDATA_XRES )
-                height = renderData.GetLong( c4d.RDATA_YRES )
-
-                print( "Creating submit info file" )
-
-                # Create the submission info file
-                jobInfoFile = self.DeadlineTemp + "/c4d_submit_info.job"
-                fileHandle = open( jobInfoFile, "w" )
-                fileHandle.write( "Plugin=Cinema4D\n" )
-                fileHandle.write( "Name=%s\n" % jobName )
-                fileHandle.write( "Comment=%s\n" % comment )
-                fileHandle.write( "Department=%s\n" % department )
-                fileHandle.write( "Group=%s\n" % group )
-                fileHandle.write( "Pool=%s\n" % pool )
-                if secondaryPool == " ": # If it's a space, then no secondary pool was selected.
-                    fileHandle.write( "SecondaryPool=\n" )
-                else:
-                    fileHandle.write( "SecondaryPool=%s\n" % secondaryPool )
-                fileHandle.write( "Priority=%s\n" % priority )
-                fileHandle.write( "MachineLimit=%s\n" % machineLimit )
-                fileHandle.write( "TaskTimeoutMinutes=%s\n" % taskTimeout )
-                fileHandle.write( "EnableAutoTimeout=%s\n" % autoTaskTimeout )
-                fileHandle.write( "ConcurrentTasks=%s\n" % concurrentTasks )
-                fileHandle.write( "LimitConcurrentTasksToNumberOfCpus=%s\n" % limitConcurrentTasks )
-                fileHandle.write( "LimitGroups=%s\n" % limitGroups )
-                fileHandle.write( "OnJobComplete=%s\n" % onComplete )
-                fileHandle.write( "Frames=%s\n" % frames )
-                fileHandle.write( "ChunkSize=%s\n" % chunkSize )
-                if submitSuspended:
-                    fileHandle.write( "InitialStatus=Suspended\n" )
-
-                if isBlacklist:
-                    fileHandle.write( "Blacklist=%s\n" % machineList )
-                else:
-                    fileHandle.write( "Whitelist=%s\n" % machineList )
-
-                outputFilenameLine = False
-                outputDirectoryLine = False
-                if saveOutput and outputPath != "":
-                    outputFilename = self.GetOutputFileName( outputPath, outputFormat, outputName )
-                    if outputFilename != "":
-                        fileHandle.write( "OutputFilename0=%s\n" % outputFilename )
-                        outputFilenameLine = True
-                    else:
-                        fileHandle.write( "OutputDirectory0=%s\n" % os.path.dirname( outputPath ) )
-                        outputDirectoryLine = True
-
-                if saveMP and mpPath != "":
-                    if mpOneFile:
-                        mpFilename = self.GetOutputFileName( mpPath, mpFormat, outputName )
-                        if mpFilename != "":
-                            if not outputFilenameLine and not outputDirectoryLine:
-                                fileHandle.write( "OutputFilename0=%s\n" % mpFilename )
-                            elif outputFilenameLine:
-                                fileHandle.write( "OutputFilename1=%s\n" % mpFilename )
-                        else:
-                            if not outputFilenameLine and not outputDirectoryLine:
-                                fileHandle.write( "OutputDirectory0=%s\n" % os.path.dirname( mpPath ) )
-                            elif outputDirectoryLine:
-                                fileHandle.write( "OutputDirectory1=%s\n" % os.path.dirname( mpPath ) )
-                    else:
-                        mPass = scene.GetActiveRenderData().GetFirstMultipass()
-                        #"Post Effects":"",  not supported: NO files were made throughout my  testing so no idea what this should be
-                        mPassTypePrefix ={
-                                            "Ambient":"_ambient",
-                                            "Diffuse":"_diffuse",
-                                            "Specular":"_specular",
-                                            "Shadow":"_shadow",
-                                            "Reflection":"_refl",
-                                            "Refraction":"_refr",
-                                            "Ambient Occlusion":"_ao",
-                                            "Global Illumination":"_gi",
-                                            "Caustics":"_caustics",
-                                            "Atmosphere":"_atmos",
-                                            "Atmosphere (Multiply)":"_atmosmul",
-                                            "Material Color":"_matcolor",
-                                            "Material Diffusion":"_matdif",
-                                            "Material Luminance":"_matlum",
-                                            "Material Transparency":"mat_trans",
-                                            "Material Reflection":"_matrefl",
-                                            "Material Environment":"_matenv",
-                                            "Material Specular":"_matspec",
-                                            "Material Specular Color":"_matspeccol",
-                                            "Material Normal":"_normal",
-                                            "Material UVW":"_uv",
-                                            "RGBA Image":"_rgb",
-                                            "Motion Vector":"_motion",
-                                            "Illumination":"_illum",
-                                            "Depth":"_depth"
-                                        }
-                        count = 1
-                        if not outputFilenameLine and not outputDirectoryLine:
-                            count = 0
-                        while mPass is not None:
-                            if not mPass.GetBit(c4d.BIT_VPDISABLED):
-                                try:
-                                    print mpPath+str(mPassTypePrefix[mPass.GetTypeName()])
-
-                                    mpFilename = self.GetOutputFileName( mpPath+str(mPassTypePrefix[mPass.GetTypeName()]), mpFormat, outputName )
-                                    fileHandle.write( "OutputFilename%i=%s\n" % (count, mpFilename) )
-                                    count += 1
-                                except:
-                                    pass
-                            mPass=mPass.GetNext()
-
-
-                #Shotgun/Draft
-                extraKVPIndex = 0
-
-                if self.GetBool( self.UseIntegrationBoxID ):
-                    if self.integrationType == 0:
-                        fileHandle.write( "ExtraInfo0=%s\n" % self.ShotgunJobSettings.get('TaskName', "") )
-                        fileHandle.write( "ExtraInfo1=%s\n" % self.ShotgunJobSettings.get('ProjectName', "") )
-                        fileHandle.write( "ExtraInfo2=%s\n" % self.ShotgunJobSettings.get('EntityName', "") )
-                        fileHandle.write( "ExtraInfo3=%s\n" % self.ShotgunJobSettings.get('VersionName', "") )
-                        fileHandle.write( "ExtraInfo4=%s\n" % self.ShotgunJobSettings.get('Description', "") )
-                        fileHandle.write( "ExtraInfo5=%s\n" % self.ShotgunJobSettings.get('UserName', "") )
-
-                        for key in self.ShotgunJobSettings:
-                            if key != 'DraftTemplate':
-                                fileHandle.write( "ExtraInfoKeyValue%d=%s=%s\n" % (extraKVPIndex, key, self.ShotgunJobSettings[key]) )
-                                extraKVPIndex += 1
-                        if self.GetBool(self.UploadMovieBoxID):
-                            fileHandle.write( "ExtraInfoKeyValue%s=Draft_CreateSGMovie=True\n" % (extraKVPIndex) )
-                            extraKVPIndex += 1
-                            groupBatch = True
-                        if self.GetBool(self.UploadFilmStripBoxID):
-                            fileHandle.write( "ExtraInfoKeyValue%s=Draft_CreateSGFilmstrip=True\n" % (extraKVPIndex) )
-                            extraKVPIndex += 1
-                            groupBatch = True
-                    else:
-                        fileHandle.write( "ExtraInfo0=%s\n" % self.FTrackJobSettings.get('FT_TaskName', "") )
-                        fileHandle.write( "ExtraInfo1=%s\n" % self.FTrackJobSettings.get('FT_ProjectName', "") )
-                        fileHandle.write( "ExtraInfo2=%s\n" % self.FTrackJobSettings.get('FT_AssetName', "") )
-                        #fileHandle.write( "ExtraInfo3=%s\n" % self.FTrackJobSettings.get('VersionName', "") )
-                        fileHandle.write( "ExtraInfo4=%s\n" % self.FTrackJobSettings.get('FT_Description', "") )
-                        fileHandle.write( "ExtraInfo5=%s\n" % self.FTrackJobSettings.get('FT_Username', "") )
-                        for key in self.FTrackJobSettings:
-                            fileHandle.write( "ExtraInfoKeyValue%d=%s=%s\n" % (extraKVPIndex, key, self.FTrackJobSettings[key]) )
-                            extraKVPIndex += 1
-                if self.GetBool( self.UseDraftBoxID ):
-                    fileHandle.write( "ExtraInfoKeyValue%d=DraftTemplate=%s\n" % (extraKVPIndex, draftTemplate) )
-                    extraKVPIndex += 1
-                    fileHandle.write( "ExtraInfoKeyValue%d=DraftUsername=%s\n" % (extraKVPIndex, draftUser) )
-                    extraKVPIndex += 1
-                    fileHandle.write( "ExtraInfoKeyValue%d=DraftEntity=%s\n" % (extraKVPIndex, draftEntity) )
-                    extraKVPIndex += 1
-                    fileHandle.write( "ExtraInfoKeyValue%d=DraftVersion=%s\n" % (extraKVPIndex, draftVersion) )
-                    extraKVPIndex += 1
-                    fileHandle.write( "ExtraInfoKeyValue%d=DraftUploadToShotgun=%s\n" % (extraKVPIndex, str(self.GetBool( self.UploadDraftToShotgunBoxID ) and self.GetBool( self.UseIntegrationBoxID ) and self.integrationType == 0) ) )
-                    extraKVPIndex += 1
-                    fileHandle.write( "ExtraInfoKeyValue%d=DraftExtraArgs=%s\n" % (extraKVPIndex, draftExtraArgs ) )
-                    extraKVPIndex += 1
+                
+                ############ Custom Racecar start
+                takesToRender = []
+                # If takes is set to All, remove All and Main from list
+                if self.Takes[ self.GetLong( self.TakesBoxID ) ] == "All":
+                    self.Takes.remove("All")
+                    self.Takes.remove("Main")
+                    takesToRender = self.Takes # Set takesToRender to the remaining takes
                     groupBatch = True
+                else:
+                    takesToRender.append( activeTake )
+                    groupBatch = False
 
-                if groupBatch:
-                    fileHandle.write( "BatchName=%s\n" % (jobName ) )
+                # Loop through the list of takes and submit them all
+                for take in takesToRender:
 
-                fileHandle.close()
+                    if exportProject:
+                        scene = documents.GetActiveDocument()
+                        sceneName = scene.GetDocumentName()
+                        originalSceneFilename = os.path.join( scene.GetDocumentPath(), sceneName )
 
-                print( "Creating plugin info file" )
+                        print( "Exporting scene" )
+                        c4d.StatusSetSpin()
+                        c4d.CallCommand( 12255 )
+                        c4d.StatusClear()
 
-                # Create the plugin info file
-                pluginInfoFile = self.DeadlineTemp + "/c4d_plugin_info.job"
-                fileHandle = open( pluginInfoFile, "w" )
-                if not submitScene:
-                    fileHandle.write( "SceneFile=%s\n" % sceneFilename )
-                # fileHandle.write( "Version=%s\n" % (c4d.GetC4DVersion() / 1000) )
-                fileHandle.write( "Version=%s\n" %  17 )
-                fileHandle.write( "Build=%s\n" % build )
-                fileHandle.write( "Threads=%s\n" % threads )
-                fileHandle.write( "Width=%s\n" % width )
-                fileHandle.write( "Height=%s\n" % height )
-                fileHandle.write( "LocalRendering=%s\n" % localRendering )
-                # Custom Racecar Takes Start
-                fileHandle.write( "Take=%s\n" % activeTake )
-                # Custom Racecar Takes End
+                        scene = documents.GetActiveDocument()
+                        sceneName = scene.GetDocumentName()
+                        newSceneFilename = os.path.join( scene.GetDocumentPath(), sceneName )
 
-                if saveOutput and outputPath != "":
-                    head, tail = os.path.split( outputPath )
-                    fileHandle.write( "FilePath=%s\n" % head )
-                    fileHandle.write( "FilePrefix=%s\n" % tail )
+                        # If the scene file name hasn't changed, that means that they canceled the export dialog.
+                        if newSceneFilename == originalSceneFilename:
+                            return True
 
-                if saveMP and mpPath != "":
-                    head, tail = os.path.split( mpPath )
-                    fileHandle.write( "MultiFilePath=%s\n" % head )
-                    fileHandle.write( "MultiFilePrefix=%s\n" % tail )
+                        #continueOn = gui.QuestionDialog( "After the export, the scene file path is now:\n\n" + sceneFilename + "\n\nDo you wish to continue with the submission?" )
+                        #if not continueOn:
+                        #   return True
 
-                fileHandle.close()
+                        submitScene = False # can't submit scene if it's being exported
 
-                print( "Submitting job" )
-                c4d.StatusSetSpin()
+                    scene = documents.GetActiveDocument()
+                    sceneName = scene.GetDocumentName()
+                    #sceneFilename = scene.GetDocumentPath() + "/" + sceneName
+                    sceneFilename = os.path.join( scene.GetDocumentPath(), sceneName )
+                    renderData = scene.GetActiveRenderData().GetData()
 
-                # Submit the job to Deadline
-                args = []
-                args.append( jobInfoFile )
-                args.append( pluginInfoFile )
-                if submitScene:
-                    args.append( sceneFilename )
+                    saveOutput = renderData.GetBool( c4d.RDATA_SAVEIMAGE )
+                    outputPath = renderData.GetFilename( c4d.RDATA_PATH )
+                    outputFormat = renderData.GetLong( c4d.RDATA_FORMAT )
+                    outputName = renderData.GetLong( c4d.RDATA_NAMEFORMAT )
 
-                results = ""
-                try:
-                    results = CallDeadlineCommand( args )
-                except:
-                    results = "An error occurred while submitting the job to Deadline."
+                    saveMP = renderData.GetBool( c4d.RDATA_MULTIPASS_ENABLE ) and renderData.GetBool( c4d.RDATA_MULTIPASS_SAVEIMAGE )
+                    mpPath = renderData.GetFilename( c4d.RDATA_MULTIPASS_FILENAME )
+                    mpFormat = renderData.GetLong( c4d.RDATA_MULTIPASS_SAVEFORMAT )
+                    mpOneFile = renderData.GetBool( c4d.RDATA_MULTIPASS_SAVEONEFILE )
+
+                    width = renderData.GetLong( c4d.RDATA_XRES )
+                    height = renderData.GetLong( c4d.RDATA_YRES )
+
+                    print( "Creating submit info file" )
+
+                    # Create the submission info file
+                    jobInfoFile = self.DeadlineTemp + "/c4d_submit_info.job"
+                    fileHandle = open( jobInfoFile, "w" )
+                    fileHandle.write( "Plugin=Cinema4D\n" )
+
+                    if take.find("<%") != -1:
+                        # print "Take with: %s" % take
+                        fileHandle.write( "Name=%s\n" % ( self.stripTakeName( take ) + " " + self.getTakeFrames( take ) ) ) #
+                    else:
+                        # print "Take without: %s" % take
+                        fileHandle.write( "Name=%s\n" % ( take + " " + self.GetString( self.FramesBoxID ) ) )
+
+
+                    fileHandle.write( "Comment=%s\n" % comment )
+                    fileHandle.write( "Department=%s\n" % department )
+                    fileHandle.write( "Group=%s\n" % group )
+                    fileHandle.write( "Pool=%s\n" % pool )
+                    if secondaryPool == " ": # If it's a space, then no secondary pool was selected.
+                        fileHandle.write( "SecondaryPool=\n" )
+                    else:
+                        fileHandle.write( "SecondaryPool=%s\n" % secondaryPool )
+                    fileHandle.write( "Priority=%s\n" % priority )
+                    fileHandle.write( "MachineLimit=%s\n" % machineLimit )
+                    fileHandle.write( "TaskTimeoutMinutes=%s\n" % taskTimeout )
+                    fileHandle.write( "EnableAutoTimeout=%s\n" % autoTaskTimeout )
+                    fileHandle.write( "ConcurrentTasks=%s\n" % concurrentTasks )
+                    fileHandle.write( "LimitConcurrentTasksToNumberOfCpus=%s\n" % limitConcurrentTasks )
+                    fileHandle.write( "LimitGroups=%s\n" % limitGroups )
+                    fileHandle.write( "OnJobComplete=%s\n" % onComplete )
+
+                    # Racecar Custom: Set frame range to either take token or the frames from the submitter box
+                    if take.find("<%") != -1:
+                        print "Submitting take: %s" % take
+                        # frames = self.getTakeFrames( take )
+                        fileHandle.write( "Frames=%s\n" % self.getTakeFrames( take ) )
+                    else:
+                        print "Submitting take: %s" % take
+                        fileHandle.write( "Frames=%s\n" % frames )
+                    
+                    fileHandle.write( "ChunkSize=%s\n" % chunkSize )
+                    if submitSuspended:
+                        fileHandle.write( "InitialStatus=Suspended\n" )
+
+                    if isBlacklist:
+                        fileHandle.write( "Blacklist=%s\n" % machineList )
+                    else:
+                        fileHandle.write( "Whitelist=%s\n" % machineList )
+
+                    outputFilenameLine = False
+                    outputDirectoryLine = False
+                    if saveOutput and outputPath != "":
+                        outputFilename = self.GetOutputFileName( outputPath, outputFormat, outputName )
+                        if outputFilename != "":
+                            fileHandle.write( "OutputFilename0=%s\n" % outputFilename )
+                            outputFilenameLine = True
+                        else:
+                            fileHandle.write( "OutputDirectory0=%s\n" % os.path.dirname( outputPath ) )
+                            outputDirectoryLine = True
+
+                    if saveMP and mpPath != "":
+                        if mpOneFile:
+                            mpFilename = self.GetOutputFileName( mpPath, mpFormat, outputName )
+                            if mpFilename != "":
+                                if not outputFilenameLine and not outputDirectoryLine:
+                                    fileHandle.write( "OutputFilename0=%s\n" % mpFilename )
+                                elif outputFilenameLine:
+                                    fileHandle.write( "OutputFilename1=%s\n" % mpFilename )
+                            else:
+                                if not outputFilenameLine and not outputDirectoryLine:
+                                    fileHandle.write( "OutputDirectory0=%s\n" % os.path.dirname( mpPath ) )
+                                elif outputDirectoryLine:
+                                    fileHandle.write( "OutputDirectory1=%s\n" % os.path.dirname( mpPath ) )
+                        else:
+                            mPass = scene.GetActiveRenderData().GetFirstMultipass()
+                            #"Post Effects":"",  not supported: NO files were made throughout my  testing so no idea what this should be
+                            mPassTypePrefix ={
+                                                "Ambient":"_ambient",
+                                                "Diffuse":"_diffuse",
+                                                "Specular":"_specular",
+                                                "Shadow":"_shadow",
+                                                "Reflection":"_refl",
+                                                "Refraction":"_refr",
+                                                "Ambient Occlusion":"_ao",
+                                                "Global Illumination":"_gi",
+                                                "Caustics":"_caustics",
+                                                "Atmosphere":"_atmos",
+                                                "Atmosphere (Multiply)":"_atmosmul",
+                                                "Material Color":"_matcolor",
+                                                "Material Diffusion":"_matdif",
+                                                "Material Luminance":"_matlum",
+                                                "Material Transparency":"mat_trans",
+                                                "Material Reflection":"_matrefl",
+                                                "Material Environment":"_matenv",
+                                                "Material Specular":"_matspec",
+                                                "Material Specular Color":"_matspeccol",
+                                                "Material Normal":"_normal",
+                                                "Material UVW":"_uv",
+                                                "RGBA Image":"_rgb",
+                                                "Motion Vector":"_motion",
+                                                "Illumination":"_illum",
+                                                "Depth":"_depth"
+                                            }
+                            count = 1
+                            if not outputFilenameLine and not outputDirectoryLine:
+                                count = 0
+                            while mPass is not None:
+                                if not mPass.GetBit(c4d.BIT_VPDISABLED):
+                                    try:
+                                        print mpPath+str(mPassTypePrefix[mPass.GetTypeName()])
+
+                                        mpFilename = self.GetOutputFileName( mpPath+str(mPassTypePrefix[mPass.GetTypeName()]), mpFormat, outputName )
+                                        fileHandle.write( "OutputFilename%i=%s\n" % (count, mpFilename) )
+                                        count += 1
+                                    except:
+                                        pass
+                                mPass=mPass.GetNext()
+
+
+                    #Shotgun/Draft
+                    extraKVPIndex = 0
+
+                    if self.GetBool( self.UseIntegrationBoxID ):
+                        if self.integrationType == 0:
+                            fileHandle.write( "ExtraInfo0=%s\n" % self.ShotgunJobSettings.get('TaskName', "") )
+                            fileHandle.write( "ExtraInfo1=%s\n" % self.ShotgunJobSettings.get('ProjectName', "") )
+                            fileHandle.write( "ExtraInfo2=%s\n" % self.ShotgunJobSettings.get('EntityName', "") )
+                            fileHandle.write( "ExtraInfo3=%s\n" % self.ShotgunJobSettings.get('VersionName', "") )
+                            fileHandle.write( "ExtraInfo4=%s\n" % self.ShotgunJobSettings.get('Description', "") )
+                            fileHandle.write( "ExtraInfo5=%s\n" % self.ShotgunJobSettings.get('UserName', "") )
+
+                            for key in self.ShotgunJobSettings:
+                                if key != 'DraftTemplate':
+                                    fileHandle.write( "ExtraInfoKeyValue%d=%s=%s\n" % (extraKVPIndex, key, self.ShotgunJobSettings[key]) )
+                                    extraKVPIndex += 1
+                            if self.GetBool(self.UploadMovieBoxID):
+                                fileHandle.write( "ExtraInfoKeyValue%s=Draft_CreateSGMovie=True\n" % (extraKVPIndex) )
+                                extraKVPIndex += 1
+                                groupBatch = True
+                            if self.GetBool(self.UploadFilmStripBoxID):
+                                fileHandle.write( "ExtraInfoKeyValue%s=Draft_CreateSGFilmstrip=True\n" % (extraKVPIndex) )
+                                extraKVPIndex += 1
+                                groupBatch = True
+                        else:
+                            fileHandle.write( "ExtraInfo0=%s\n" % self.FTrackJobSettings.get('FT_TaskName', "") )
+                            fileHandle.write( "ExtraInfo1=%s\n" % self.FTrackJobSettings.get('FT_ProjectName', "") )
+                            fileHandle.write( "ExtraInfo2=%s\n" % self.FTrackJobSettings.get('FT_AssetName', "") )
+                            #fileHandle.write( "ExtraInfo3=%s\n" % self.FTrackJobSettings.get('VersionName', "") )
+                            fileHandle.write( "ExtraInfo4=%s\n" % self.FTrackJobSettings.get('FT_Description', "") )
+                            fileHandle.write( "ExtraInfo5=%s\n" % self.FTrackJobSettings.get('FT_Username', "") )
+                            for key in self.FTrackJobSettings:
+                                fileHandle.write( "ExtraInfoKeyValue%d=%s=%s\n" % (extraKVPIndex, key, self.FTrackJobSettings[key]) )
+                                extraKVPIndex += 1
+                    if self.GetBool( self.UseDraftBoxID ):
+                        fileHandle.write( "ExtraInfoKeyValue%d=DraftTemplate=%s\n" % (extraKVPIndex, draftTemplate) )
+                        extraKVPIndex += 1
+                        fileHandle.write( "ExtraInfoKeyValue%d=DraftUsername=%s\n" % (extraKVPIndex, draftUser) )
+                        extraKVPIndex += 1
+                        fileHandle.write( "ExtraInfoKeyValue%d=DraftEntity=%s\n" % (extraKVPIndex, draftEntity) )
+                        extraKVPIndex += 1
+                        fileHandle.write( "ExtraInfoKeyValue%d=DraftVersion=%s\n" % (extraKVPIndex, draftVersion) )
+                        extraKVPIndex += 1
+                        fileHandle.write( "ExtraInfoKeyValue%d=DraftUploadToShotgun=%s\n" % (extraKVPIndex, str(self.GetBool( self.UploadDraftToShotgunBoxID ) and self.GetBool( self.UseIntegrationBoxID ) and self.integrationType == 0) ) )
+                        extraKVPIndex += 1
+                        fileHandle.write( "ExtraInfoKeyValue%d=DraftExtraArgs=%s\n" % (extraKVPIndex, draftExtraArgs ) )
+                        extraKVPIndex += 1
+                        groupBatch = True
+
+                    if groupBatch:
+                        fileHandle.write( "BatchName=%s\n" % ( jobName ) )
+
+                    fileHandle.close()
+
+                    print( "Creating plugin info file" )
+
+                    # Create the plugin info file
+                    pluginInfoFile = self.DeadlineTemp + "/c4d_plugin_info.job"
+                    fileHandle = open( pluginInfoFile, "w" )
+                    if not submitScene:
+                        fileHandle.write( "SceneFile=%s\n" % sceneFilename )
+                    # fileHandle.write( "Version=%s\n" % (c4d.GetC4DVersion() / 1000) )
+                    fileHandle.write( "Version=%s\n" %  17 )
+                    fileHandle.write( "Build=%s\n" % build )
+                    fileHandle.write( "Threads=%s\n" % threads )
+                    fileHandle.write( "Width=%s\n" % width )
+                    fileHandle.write( "Height=%s\n" % height )
+                    fileHandle.write( "LocalRendering=%s\n" % localRendering )
+                    # Custom Racecar Takes Start
+                    fileHandle.write( "Take=%s\n" % activeTake )
+                    # Custom Racecar Takes End
+
+                    if saveOutput and outputPath != "":
+                        head, tail = os.path.split( outputPath )
+                        fileHandle.write( "FilePath=%s\n" % head )
+                        fileHandle.write( "FilePrefix=%s\n" % tail )
+
+                    if saveMP and mpPath != "":
+                        head, tail = os.path.split( mpPath )
+                        fileHandle.write( "MultiFilePath=%s\n" % head )
+                        fileHandle.write( "MultiFilePrefix=%s\n" % tail )
+
+                    fileHandle.close()
+
+                    print( "Submitting job" )
+                    c4d.StatusSetSpin()
+
+                    # Submit the job to Deadline
+                    args = []
+                    args.append( jobInfoFile )
+                    args.append( pluginInfoFile )
+                    if submitScene:
+                        args.append( sceneFilename )
+
+                    results = ""
+                    try:
+                        results = CallDeadlineCommand( args )
+                    except:
+                        results = "An error occurred while submitting the job to Deadline."
+                ############ Custom Racecar end
 
                 c4d.StatusClear()
 
