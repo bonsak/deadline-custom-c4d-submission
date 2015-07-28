@@ -94,7 +94,7 @@ class Cinema4DPlugin (DeadlinePlugin):
         sceneFile = RepositoryUtils.CheckPathMapping( sceneFile )
         sceneFile = self.ProcessPath( sceneFile )
 
-        activeTake = self.GetPluginInfoEntryWithDefault("Take",0)
+        activeTake = self.GetPluginInfoEntryWithDefault("Take","Main")
 
         argument = " -nogui"
         argument += " -render \"" + sceneFile + "\""
